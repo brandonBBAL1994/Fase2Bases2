@@ -63,7 +63,7 @@ router.get('/golesPorTemporada', jsonParser, function (req, res) {
             arrayTeam = []
         }
 
-        mongoDB.close()
+        //mongoDB.close()
         res.send({data: arrayFinal})
     })
 });
@@ -106,7 +106,7 @@ router.get('/consultaK', jsonParser, function(req, res){
 
         const salida = { ganados: mayorGanados, perdidos: mayorPerdidos, empates: mayorEmpates }
         
-        mongoDB.close()
+        //mongoDB.close()
         res.send({data: salida})
     })
 })
@@ -151,7 +151,7 @@ router.get('/victoriaMasAbultada', jsonParser, function(req, res) {
                 }
             }
         }
-        mongoDB.close()
+        //mongoDB.close()
         res.send({data: arrayTeam})
     })
 })
@@ -200,6 +200,72 @@ const setArrayQueryG = (arrayTeam, local, visita, gol_local, gol_visita, tempora
 
 }
 
+
+router.post('/E/victimaFavorita', jsonParser, function(req, res){
+
+    const query = ({$or: [{"jornadas.partidos.local": req.body.nombre}, {"jornadas.partidos.visita": req.body.nombre}]}, {"jornadas.partidos.$": 1})
+
+    mongoDB.db(DB_NAME).collection(COLLECTION_PARTIDOS).find({}).toArray((error, result) => {
+        if(error) return null
+        let arrayTeam = []
+
+        for(let i = 0; i < result.length; i++){
+            let jornadas = result[i].jornadas
+            for(let j = 0; j < jornadas.length; j++){
+                let partidos = jornadas[j].partidos
+                for(let z = 0; z < partidos.length; z++){
+                    let juego = partidos[z]
+                    if(juego.local !== req.body.nombre && juego.visita !== req.body.nombre ) continue
+                    if(juego.gol_local === juego.gol_visita) continue
+                    setArrayQueryE(arrayTeam, juego.local, juego.visita, juego.gol_local, juego.gol_visita, req.body.nombre)
+                }
+            }
+        }
+
+        arrayTeam.sort(function(a,b) {
+            return b.total - a.total
+        })
+
+        const victimaPreferida = {ganador: arrayTeam[0].ganador, perdedor: arrayTeam[0].perdedor, vencidas: arrayTeam[0].total}
+
+        //mongoDB.close()
+        res.send({data: victimaPreferida})
+    })
+})
+
+
+const setArrayQueryE = (arrayTeam, local, visita, gol_local, gol_visita, buscado) => {
+
+    if(arrayTeam.length !== 0){
+        if(gol_local > gol_visita){
+            if(local === buscado){
+                if(arrayTeam.filter(resultado => (resultado.ganador === local && resultado.perdedor === visita)).length === 0){
+                    arrayTeam.push({ganador: local, perdedor: visita, total: 1})
+                }else{
+                    arrayTeam.filter(resultado => (resultado.ganador === local && resultado.perdedor === visita))[0].total += 1
+                }
+            }
+        }else{
+            if(visita === buscado){
+                if(arrayTeam.filter(resultado => (resultado.ganador === visita && resultado.perdedor === local)).length === 0){
+                    arrayTeam.push({ganador: visita, perdedor: local, total: 1})
+                }else{
+                    arrayTeam.filter(resultado => (resultado.ganador === visita && resultado.perdedor === local))[0].total += 1
+                } 
+            }
+        }
+    }else{
+        if(gol_local > gol_visita){
+            if(local === buscado){
+                arrayTeam.push({ganador: local, perdedor: visita, total: 1})
+            }
+        }else{
+            if(visita === buscado){
+                arrayTeam.push({ganador: visita, perdedor: local, total: 1})
+            }
+        }
+    }
+}
 
 
 app.use("/api", router);
